@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>서울대 한국어 4A - 5과 단어 게임</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f5f7fb;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .game-container {
+            background: #ffffff;
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        h1 { font-size: 1.2rem; text-align: center; margin-bottom: 5px; }
+        .subtitle { text-align: center; font-size: 0.85rem; color: #666; margin-bottom: 15px; }
+        
+        .top-row { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        .chip-label { font-weight: bold; font-size: 14px; margin-right: 5px; }
+
+        .status-bar { display: flex; justify-content: space-between; font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; }
+        
+        .card { 
+            background: #f0f4ff; border-radius: 14px; padding: 30px 15px; 
+            margin-bottom: 15px; text-align: center; 
+        }
+        .question-text { font-size: 2.2rem; font-weight: bold; color: #333; margin-bottom: 10px; word-break: keep-all; }
+        .lang-label { font-size: 0.9rem; color: #6b7280; }
+
+        #options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .option-btn {
+            padding: 20px 10px; font-size: 1.2rem; border-radius: 10px;
+            border: 2px solid #e5e7eb; background: #f9fafb; cursor: pointer;
+            transition: all 0.2s; word-break: keep-all; min-height: 80px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .option-btn.correct { background: #dcfce7 !important; border-color: #22c55e !important; color: #166534; }
+        .option-btn.wrong { background: #fee2e2 !important; border-color: #ef4444 !important; color: #991b1b; }
+
+        #next-btn {
+            margin-top: 20px; width: 100%; padding: 15px; font-size: 1.5rem;
+            background: #4f46e5; color: white; border: none; border-radius: 12px;
+            cursor: pointer; font-weight: bold;
+        }
+        #next-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 100; }
+        .overlay.show { display: flex; }
+        .celebrate-card { background: white; padding: 30px; border-radius: 20px; text-align: center; max-width: 80%; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        
+        /* 폭죽 애니메이션 */
+        .confetti { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+        .confetti span {
+            position: absolute; width: 10px; height: 10px; background: #ff0;
+            animation: fall 3s linear infinite;
+        }
+        @keyframes fall {
+            0% { transform: translateY(-100vh) rotate(0deg); }
+            100% { transform: translateY(100vh) rotate(720deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>서울대 한국어 4A - 5과 단어 퀴즈</h1>
+        <div class="subtitle">5과 어휘를 마스터해 보세요!</div>
+
+        <div class="top-row">
+            <div class="direction">
+                <span class="chip-label">방향:</span>
+                <label><input type="radio" name="direction" value="vi2ko" checked> 🇻🇳 → 🇰🇷</label>
+                <label><input type="radio" name="direction" value="ko2vi"> 🇰🇷 → 🇻🇳</label>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span>문제: <span id="q-num">1</span></span>
+            <span class="word-count">단어 수: <span id="wordCount"></span></span>
+            <span>점수: <span id="current-score">0</span></span>
+        </div>
+
+        <div class="card">
+            <div class="lang-label" id="lang-label">학습 준비 완료!</div>
+            <div class="question-text" id="q-text">시작하려면 클릭</div>
+        </div>
+
+        <div id="options"></div>
+        <div id="message" style="text-align:center; margin-top:10px; min-height:1.5em; font-weight:bold;"></div>
+        <button id="next-btn" disabled>다음 문제</button>
+    </div>
+
+    <div class="overlay" id="overlay">
+        <div class="confetti" id="confetti-container"></div>
+        <div class="celebrate-card">
+            <h2 style="font-size: 2rem;">🎊 축하합니다! 🎊</h2>
+            <p style="font-size: 1.2rem;">5과 단어 퀴즈 100점을 달성하셨습니다!</p>
+            <p>당신은 이제 5과 마스터입니다.</p>
+            <button onclick="location.reload()" style="padding:10px 20px; background:#4f46e5; color:white; border:none; border-radius:10px; cursor:pointer;">다시 하기</button>
+        </div>
+    </div>
+
+    
+    <script>
+        // 5과 데이터 (올인원)
+        const WORDS_ALL = [
+            ["입이 가볍다", "lẻo mép, hay buôn chuyện"], ["입이 무겁다", "kín tiếng"], ["입이 짧다", "kén ăn"],
+            ["눈이 높다", "tiêu chuẩn cao"], ["귀가 얇다", "dễ tin người"], ["발이 넓다", "quan hệ rộng"],
+            ["인정을 받다", "được 공 nhận"], ["야단을 치다", "mắng"], ["신입 사원", "nhân viên mới"],
+            ["부장님", "trưởng phòng"], ["혼나다", "bị mắng"], ["마트", "cửa hàng / siêu thị"],
+            ["경쟁", "sự cạnh tranh"], ["장사가 안되다", "buôn bán không thuận lợi"], ["눈덩이", "cục tuyết"],
+            ["외로움", "sự cô đơn"], ["상식", "kiến thức thông thông thường"], ["풍부하다", "phong phú"],
+            ["사연", "câu chuyện, hoàn cảnh"], ["여대생", "sinh viên nữ"], ["연락이 뜸하다", "ít liên lạc"],
+            ["기말고사", "thi cuối kì"], ["왠지", "không hiểu sao"], ["배신감", "cảm giác bị phản bội"],
+            ["안타깝다", "tiếc nuối"], ["석사", "thạc sĩ"], ["논문", "luận văn"], ["느긋하게", "một cách chậm rãi"],
+            ["박사과정", "quá trình học tiến sĩ"], ["입학 원서", "đơn xin nhập học"], ["마감", "hạn"],
+            ["겹치다", "chồng lên"], ["정신이 없다", "không có tâm trí"], ["하필이면", "sao cứ phải là"],
+            ["겨우", "một cách khó khăn"], ["월세", "tiền thuê nhà hàng tháng"]
+        ];
+        document.getElementById("wordCount").textContent = WORDS_ALL.length;
+
+        // ===== 설정 =====
+        const BASE_POINTS = 1;        // 기본 정답 점수
+        const COMBO_BONUS = 1;        // 콤보(연속 정답) 보너스
+        // 콤보 점수 = BASE_POINTS + COMBO_BONUS  (즉, 3점)
+
+        let score = 0;
+        let questionCount = 1;
+        let direction = "vi2ko";
+
+        // 덱(중복 없이 한 바퀴 돌기)
+        let deck = [];
+        let lastQuestionKey = null;   // 직전 문제(중복 방지)
+        let streak = 0;               // 연속 정답(콤보) 카운트
+
+        const qText = document.getElementById("q-text");
+        const langLabel = document.getElementById("lang-label");
+        const optionsDiv = document.getElementById("options");
+        const nextBtn = document.getElementById("next-btn");
+        const scoreEl = document.getElementById("current-score");
+        const qNumEl = document.getElementById("q-num");
+        const messageEl = document.getElementById("message");
+
+        // 축하 효과음 (기존 Base64 내장 음원 유지)
+        const cheerAudio = new Audio("data:audio/mpeg;base64,//uUBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAETAAGeAAACBQgLDQ8SFRcaHB8hJCcpKy4xNDU4Oz5AQ0VISk1QUlRXWl1eYWRnaWtucXN2eXt9gIOGh4qNkJKUl5qcn6Gkpqmsr7Cztrm7vcDDxcjKzc/S1dfZ3N/i5Obp7O7x8/b4+/4AAAA7TEFNRTMuMTAwAaoAAAAAAAAAABSAJAJAhgAAgAABngA4AvjL...");
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function createConfetti() {
+            const container = document.getElementById("confetti-container");
+            container.innerHTML = "";
+            for (let i = 0; i < 60; i++) {
+                const span = document.createElement("span");
+                span.style.left = Math.random() * 100 + "vw";
+                span.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 55%)`;
+                span.style.animationDelay = Math.random() * 1.6 + "s";
+                container.appendChild(span);
+            }
+        }
+
+        function showCelebration() {
+            document.getElementById("overlay").classList.add("show");
+            createConfetti();
+            try {
+                cheerAudio.currentTime = 0;
+                cheerAudio.play().catch(() => {});
+            } catch (e) {}
+        }
+
+        function rebuildDeck() {
+            // 덱을 인덱스로 구성해서 중복 없이 출제
+            deck = Array.from({ length: WORDS_ALL.length }, (_, i) => i);
+            shuffle(deck);
+
+            // 새 덱의 마지막(=pop될 첫 문제)이 직전 문제와 같으면 swap
+            if (deck.length >= 2) {
+                const firstIdx = deck[deck.length - 1];
+                const firstKey = WORDS_ALL[firstIdx][0]; // 한국어를 문제 키로 고정
+                if (lastQuestionKey && firstKey === lastQuestionKey) {
+                    const a = deck.length - 1;
+                    const b = deck.length - 2;
+                    [deck[a], deck[b]] = [deck[b], deck[a]];
+                }
+            }
+        }
+
+        function pickNextWord() {
+            if (deck.length === 0) rebuildDeck();
+
+            let idx = deck.pop();
+            let key = WORDS_ALL[idx][0];
+
+            if (lastQuestionKey && key === lastQuestionKey && deck.length > 0) {
+                const idx2 = deck.pop();
+                deck.push(idx);
+                idx = idx2;
+                key = WORDS_ALL[idx][0];
+            }
+
+            lastQuestionKey = key;
+            return WORDS_ALL[idx];
+        }
+
+        function newQuestion() {
+            if (score >= 100) {
+                showCelebration();
+                return;
+            }
+
+            nextBtn.disabled = true;
+            messageEl.textContent = "";
+
+            const correctWord = pickNextWord(); // [ko, vi]
+            const q = direction === "vi2ko" ? correctWord[1] : correctWord[0];
+            const ans = direction === "vi2ko" ? correctWord[0] : correctWord[1];
+
+            langLabel.textContent = direction === "vi2ko" ? "Tiếng Việt" : "한국어";
+            qText.textContent = q;
+
+            const pool = WORDS_ALL.map(w => direction === "vi2ko" ? w[0] : w[1])
+                                  .filter(v => v && v !== ans);
+
+            shuffle(pool);
+            let choices = [ans, pool[0], pool[1], pool[2]];
+            shuffle(choices);
+
+            optionsDiv.innerHTML = "";
+            choices.forEach(choice => {
+                const btn = document.createElement("button");
+                btn.className = "option-btn";
+                btn.textContent = choice;
+                btn.onclick = () => checkAnswer(choice, ans, btn);
+                optionsDiv.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selected, correct, btn) {
+            const allBtns = document.querySelectorAll(".option-btn");
+            allBtns.forEach(b => b.disabled = true);
+
+            if (selected === correct) {
+                btn.classList.add("correct");
+
+                const gained = (streak >= 1) ? (BASE_POINTS + COMBO_BONUS) : BASE_POINTS;
+                score += gained;
+                streak += 1;
+
+                scoreEl.textContent = score;
+                messageEl.textContent = (gained === BASE_POINTS)
+                    ? `정답입니다! +${gained}점 🎉`
+                    : `콤보! +${gained}점 🔥`;
+                messageEl.style.color = "#166534";
+            } else {
+                btn.classList.add("wrong");
+                streak = 0;
+                messageEl.textContent = `틀렸어요. 정답은: ${correct}`;
+                messageEl.style.color = "#dc2626";
+            }
+
+            if (score >= 100) {
+                showCelebration();
+                return;
+            }
+
+            nextBtn.disabled = false;
+        }
+
+        nextBtn.onclick = () => {
+            questionCount++;
+            qNumEl.textContent = questionCount;
+            newQuestion();
+        };
+
+        document.querySelectorAll('input[name="direction"]').forEach(r => {
+            r.onchange = (e) => {
+                direction = e.target.value;
+                score = 0;
+                questionCount = 1;
+                streak = 0;
+                lastQuestionKey = null;
+                scoreEl.textContent = "0";
+                qNumEl.textContent = "1";
+                rebuildDeck();
+                newQuestion();
+            };
+        });
+
+        rebuildDeck();
+        newQuestion();
+    </script>
+
+</body>
+</html>
